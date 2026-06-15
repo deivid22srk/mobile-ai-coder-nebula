@@ -1163,10 +1163,10 @@ function renderChatsList(chats: Chat[]) {
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'drawer-delete-btn';
     deleteBtn.title = 'Delete chat';
-    deleteBtn.innerHTML = '&times;';
+    deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
     deleteBtn.onclick = (e) => {
       e.stopPropagation();
-      deleteChat(chat.id);
+      showDeleteConfirm(chat.id, chat.title);
     };
 
     item.appendChild(info);
@@ -1181,18 +1181,50 @@ function renderChatsList(chats: Chat[]) {
   });
 }
 
-async function deleteChat(id: number) {
-  if (!confirm('Delete this chat?')) return;
-  try {
-    const res = await fetch(`/api/chats/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-      if (activeChatId === id) startNewChat();
-      loadChats();
+function showDeleteConfirm(chatId: number, chatTitle: string) {
+  const existing = document.getElementById('confirm-dialog-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'confirm-dialog-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.style.zIndex = '3000';
+
+  const dialog = document.createElement('div');
+  dialog.className = 'confirm-dialog';
+
+  dialog.innerHTML = `
+    <div class="confirm-dialog-icon">
+      <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#E53E3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+    </div>
+    <h3 class="confirm-dialog-title">Delete chat?</h3>
+    <p class="confirm-dialog-msg">"${chatTitle}" and all its messages will be permanently deleted.</p>
+    <div class="confirm-dialog-actions">
+      <button class="secondary-button" id="btn-confirm-cancel">Cancel</button>
+      <button class="primary-button" id="btn-confirm-delete" style="background-color:#E53E3E;color:#fff">Delete</button>
+    </div>
+  `;
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  document.getElementById('btn-confirm-cancel')!.onclick = () => overlay.remove();
+  document.getElementById('btn-confirm-delete')!.onclick = async () => {
+    overlay.remove();
+    try {
+      const res = await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        if (activeChatId === chatId) startNewChat();
+        loadChats();
+      }
+    } catch (err) {
+      console.error('Failed to delete chat:', err);
     }
-  } catch (err) {
-    console.error('Failed to delete chat:', err);
-  }
+  };
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
 }
 
 export async function selectChat(id: number) {
