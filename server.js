@@ -671,7 +671,7 @@ const activeProcesses = new Map();
 function executeCommandWithStreaming(command, cwd, id, sendEvent, timeoutSec = 120) {
   return new Promise(resolve => {
     const { spawn } = require('child_process');
-    const child = spawn(command, { shell: true, cwd });
+    const child = spawn(command, { shell: true, cwd, detached: true });
 
     let accumulatedOutput = '';
     let resolved = false;
@@ -725,7 +725,11 @@ function executeCommandWithStreaming(command, cwd, id, sendEvent, timeoutSec = 1
           // Non-server command timeout (e.g., waiting for npm install)
           setTimeout(() => {
             if (!resolved) {
-              child.kill('SIGKILL');
+              try {
+                process.kill(-child.pid, 'SIGKILL');
+              } catch (e) {
+                child.kill('SIGKILL');
+              }
               resolveTool(false);
             }
           }, (timeoutSec - 5) * 1000);
