@@ -383,6 +383,7 @@ export async function startAgentStream(chatId: number | null, isReconnect: boole
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let streamBuffer = '';
+    let shouldCloseStream = false;
 
     while (true) {
       const { value, done } = await reader.read();
@@ -463,6 +464,7 @@ export async function startAgentStream(chatId: number | null, isReconnect: boole
               errDiv.textContent = `Error: ${payload.content}`;
               currentAssistantContentDiv!.appendChild(errDiv);
               scrollToBottom();
+              shouldCloseStream = true;
               break;
 
             case 'done':
@@ -470,11 +472,19 @@ export async function startAgentStream(chatId: number | null, isReconnect: boole
                 activeChatId = payload.chatId;
                 localStorage.setItem('activeChatId', activeChatId.toString());
               }
+              shouldCloseStream = true;
               break;
           }
         } catch (parseErr) {
           console.error("Error parsing stream chunk:", line, parseErr);
         }
+      }
+
+      if (shouldCloseStream) {
+        try {
+          await reader.cancel();
+        } catch (e) {}
+        break;
       }
     }
 
@@ -1104,6 +1114,7 @@ export async function selectChat(id: number) {
   activeChatId = id;
   localStorage.setItem('activeChatId', id.toString());
   chatMessages.innerHTML = '<div style="padding:16px; color:var(--color-accent); font-family:monospace;">Loading chat history...</div>';
+  if (agentStatusBar) agentStatusBar.classList.add('hidden');
   try {
     const res = await fetch(`/api/chats/${id}`);
     const data = await res.json() as Chat;
@@ -1203,6 +1214,7 @@ export function startNewChat() {
       </div>
     </div>
   `;
+  if (agentStatusBar) agentStatusBar.classList.add('hidden');
   toggleDrawer(false);
 }
 
