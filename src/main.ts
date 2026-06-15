@@ -1135,8 +1135,24 @@ function renderConversation() {
     if (msg.role === 'user') {
       appendUserMessage(msg.content);
     } else if (msg.role === 'assistant') {
-      if (msg.type === 'tool_call') {
-        // Simple representation for history tool calls
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        msg.tool_calls.forEach(tc => {
+          const tcId = tc.id || `hist-${Math.random()}`;
+          const tcName = tc.function?.name || 'unknown';
+          const tcArgs = tc.function?.arguments || '{}';
+
+          // Find matching tool output in history
+          const matchingToolMsg = conversationHistory.find(
+            item => item.role === 'tool' && item.tool_call_id === tc.id
+          );
+
+          createToolCardElement(tcId, tcName, tcArgs);
+          if (matchingToolMsg) {
+            finalizeToolCardElement(tcId, tcName, matchingToolMsg.content);
+          }
+        });
+      } else if (msg.type === 'tool_call') {
+        // Simple representation for old history tool calls
         const div = document.createElement('div');
         div.style.fontFamily = 'monospace';
         div.style.fontSize = '0.8rem';
@@ -1154,14 +1170,22 @@ function renderConversation() {
         chatMessages.appendChild(msgDiv);
       }
     } else if (msg.role === 'tool') {
-       const div = document.createElement('div');
-       div.style.fontFamily = 'monospace';
-       div.style.fontSize = '0.75rem';
-       div.style.color = 'var(--color-text-sub)';
-       div.style.padding = '4px 16px';
-       div.style.borderLeft = '1px solid var(--color-border)';
-       div.textContent = `↩ ${msg.content.slice(0, 100)}${msg.content.length > 100 ? '...' : ''}`;
-       chatMessages.appendChild(div);
+      // If this tool output has a matching tool call in history, it is already rendered beautifully.
+      // Otherwise render the fallback plain representation.
+      const hasToolCallInHistory = conversationHistory.some(
+        item => item.role === 'assistant' && item.tool_calls && item.tool_calls.some(tc => tc.id === msg.tool_call_id)
+      );
+
+      if (!hasToolCallInHistory) {
+        const div = document.createElement('div');
+        div.style.fontFamily = 'monospace';
+        div.style.fontSize = '0.75rem';
+        div.style.color = 'var(--color-text-sub)';
+        div.style.padding = '4px 16px';
+        div.style.borderLeft = '1px solid var(--color-border)';
+        div.textContent = `↩ ${msg.content.slice(0, 100)}${msg.content.length > 100 ? '...' : ''}`;
+        chatMessages.appendChild(div);
+      }
     }
   });
   scrollToBottom();
