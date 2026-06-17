@@ -317,7 +317,7 @@ const DEFAULT_CONFIG = {
   apiKey: '0',
   opencodeZenApiKey: '',
   model: 'qwen-plus',
-  systemPrompt: 'You are *coder (mobile-ai-coder), a powerful agentic AI coding assistant optimized for mobile. You have access to local tools in the workspace: write_file, read_file, list_dir, run_command, git_clone, and (when the user has connected GitHub) github_list_repos, github_create_repo, github_push_files, github_get_user.\n\nUse these tools to help the user. Always explain what you are doing (e.g. "I am going to read the index.html file to inspect its content") right before invoking a tool. Make sure code changes are correct and tested.\n\n## Iteration Limit\n\nYou have a limited number of tool calls per turn. When you need more, you MUST end your response with a clear instruction like "Tell me to continue and I will keep working on this." or "Say \\"continue\\" and I will finish the remaining steps." The user will then say "continue" and you can proceed. Always track progress with `update_plan` so the user knows what has been done and what remains.\n\n## Sub-Agents\n\nYou can spawn sub-agents to delegate work using `spawn_agent`. This is useful for:\n- Exploring code in parallel while you plan\n- Delegating large refactoring tasks\n- Running independent investigations\n\nAfter spawning, use `list_agents` to check status and `wait_agent` to get results.\nSub-agents share your workspace and tools but focus only on their assigned task.\n\n## update_Plan Tool\n\nYou have access to an `update_plan` tool which tracks steps and progress as a visual checklist for the user.\n\n**When to use a plan:**\n- The task is non-trivial and requires multiple actions\n- There are logical phases or dependencies where sequencing matters\n- The user asked for multiple things in one prompt\n- You generate additional steps while working\n\n**When NOT to use a plan:**\n- Simple or single-step queries you can do immediately\n- Questions or brainstorming that don\'t need code changes\n\n**How to use update_plan:**\n- Create a plan with short 1-sentence steps (max 10 words each)\n- Each step must have a status: `pending`, `in_progress`, or `completed`\n- Exactly one step should be `in_progress` at a time\n- Update the plan as you complete steps: mark finished steps as `completed` and the next step as `in_progress`\n- When all steps are complete, mark all as `completed`\n- Do not jump an item from pending to completed without setting it to in_progress first\n- Update your plan before reaching the iteration limit so the user can see your progress',
+  systemPrompt: 'You are *coder (mobile-ai-coder), a powerful agentic AI coding assistant optimized for mobile. You have access to local tools in the workspace: write_file, read_file, list_dir, run_command, git_clone, and (when the user has connected GitHub) github_list_repos, github_create_repo, github_push_files, github_get_user.\n\nUse these tools to help the user. Always explain what you are doing (e.g. "I am going to read the index.html file to inspect its content") right before invoking a tool. Make sure code changes are correct and tested.\n\n## Work Continuation\n\nYou can make as many tool calls as needed to complete a task. The system will automatically keep you running until the task is done. You do NOT need to ask the user for permission to continue - just keep working. Use `update_plan` to track progress so the user can see what has been done and what remains. Only stop and present your final result when all steps are complete or when you need user input to proceed.\n\n## Sub-Agents\n\nYou can spawn sub-agents to delegate work using `spawn_agent`. This is useful for:\n- Exploring code in parallel while you plan\n- Delegating large refactoring tasks\n- Running independent investigations\n\nAfter spawning, use `list_agents` to check status and `wait_agent` to get results.\nSub-agents share your workspace and tools but focus only on their assigned task.\n\n## update_Plan Tool\n\nYou have access to an `update_plan` tool which tracks steps and progress as a visual checklist for the user.\n\n**When to use a plan:**\n- The task is non-trivial and requires multiple actions\n- There are logical phases or dependencies where sequencing matters\n- The user asked for multiple things in one prompt\n- You generate additional steps while working\n\n**When NOT to use a plan:**\n- Simple or single-step queries you can do immediately\n- Questions or brainstorming that don\'t need code changes\n\n**How to use update_plan:**\n- Create a plan with short 1-sentence steps (max 10 words each)\n- Each step must have a status: `pending`, `in_progress`, or `completed`\n- Exactly one step should be `in_progress` at a time\n- Update the plan as you complete steps: mark finished steps as `completed` and the next step as `in_progress`\n- When all steps are complete, mark all as `completed`\n- Do not jump an item from pending to completed without setting it to in_progress first',
   workspacePath: path.join(__dirname, 'workspace'),
   githubToken: '',
   githubUser: null
@@ -1681,12 +1681,11 @@ async function runAgentExecution(chatId, clientMessages) {
 
   // Run the background execution
   execution.promise = (async () => {
-    let loopLimit = 50; // Limit tool loop to prevent infinite runs
+    const MAX_TOOL_LOOPS = 500; // Safety limit
     let currentIteration = 0;
-    let hitLoopLimit = false;
 
     try {
-      while (currentIteration < loopLimit && !execution.cancelled) {
+      while (currentIteration < MAX_TOOL_LOOPS && !execution.cancelled) {
         currentIteration++;
 
         broadcastEvent('status', { content: 'Thinking...' });
@@ -2196,49 +2195,61 @@ async function runAgentExecution(chatId, clientMessages) {
           // Loop continues to feed tool outputs back to LLM
           continue;
         } else {
-          // No tool calls means we are finished
+          // No tool calls: check if there are incomplete plan steps
           messages.push(assistantMessage);
-        }
 
-        break;
+          const planSteps = messages.filter(m => m.role === 'tool' && m.name === 'update_plan');
+          const lastPlan = planSteps[planSteps.length - 1];
+          let hasIncompleteSteps = false;
+
+          if (lastPlan) {
+            try {
+              const planData = JSON.parse(lastPlan.content);
+              if (planData.summary) {
+                // Parse summary like "Plan updated: 2/5 steps completed, 1 in progress."
+                const match = planData.summary.match(/(\d+)\/(\d+)/);
+                if (match) {
+                  const completed = parseInt(match[1]);
+                  const total = parseInt(match[2]);
+                  hasIncompleteSteps = completed < total;
+                }
+              } else {
+                // Check plan array directly
+                const planArr = planData.plan || [];
+                hasIncompleteSteps = planArr.some(s => s.status === 'pending' || s.status === 'in_progress');
+              }
+            } catch (_) {}
+          }
+
+          if (hasIncompleteSteps && currentIteration < loopLimit) {
+            // Auto-continue: inject instruction to keep working
+            broadcastEvent('status', { content: 'Auto-continuing to complete remaining steps...' });
+            messages.push({
+              role: 'system',
+              content: 'You have incomplete steps remaining. Continue working on them. Do not ask the user for permission - just proceed with the next step.'
+            });
+            continue;
+          }
+          // No plan or all steps complete: finished
+          broadcastEvent('done', { chatId });
+
+          // Persist final assistant message
+          if (!execution.cancelled) {
+            const finalAssistant = messages[messages.length - 1];
+            if (finalAssistant && finalAssistant.role === 'assistant' && !finalAssistant.tool_calls) {
+              saveMessage('assistant', finalAssistant.content);
+            }
+          }
+          break;
+        }
       }
 
-      // Check if the loop exited due to iteration limit (not natural completion)
-      hitLoopLimit = currentIteration >= loopLimit && !execution.cancelled;
-
-      if (hitLoopLimit) {
-        // Extract context about what the agent was doing
-        const lastToolCalls = messages.filter(m => m.role === 'assistant' && m.tool_calls);
-        const lastToolCall = lastToolCalls[lastToolCalls.length - 1];
-        const planSteps = messages.filter(m => m.role === 'tool' && m.name === 'update_plan');
-        const lastPlan = planSteps[planSteps.length - 1];
-        let planSummary = '';
-        if (lastPlan) {
-          try {
-            const planData = JSON.parse(lastPlan.content);
-            planSummary = planData.summary || '';
-          } catch (_) {}
-        }
-
-        const continueMsg = `I've reached my iteration limit for this turn. I was working on: ${lastToolCall ? lastToolCall.tool_calls.map(t => t.function.name).join(', ') : 'the current task'}. ${planSummary ? `Progress: ${planSummary}. ` : ''}Please tell me to "continue" so I can keep going.`;
-        messages.push({ role: 'assistant', content: continueMsg });
-
-        broadcastEvent('needs_continue', {
-          content: continueMsg,
-          planSummary: planSummary
-        });
-
-        // Persist the continuation message
-        saveMessage('assistant', continueMsg);
-      } else {
+      // Safety limit reached (should practically never happen with 500 limit)
+      if (!execution.cancelled) {
         broadcastEvent('done', { chatId });
-      }
-
-      // Persist final assistant message (only if not the loop limit case)
-      if (!execution.cancelled && !hitLoopLimit) {
-        const finalAssistant = messages[messages.length - 1];
-        if (finalAssistant && finalAssistant.role === 'assistant' && !finalAssistant.tool_calls) {
-          saveMessage('assistant', finalAssistant.content);
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === 'assistant' && !lastMsg.tool_calls) {
+          saveMessage('assistant', lastMsg.content);
         }
       }
     } catch (err) {
