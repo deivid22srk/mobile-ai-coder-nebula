@@ -717,6 +717,16 @@ export async function startAgentStream(chatId: number | null, isReconnect: boole
               scrollToBottom();
               break;
 
+            case 'plan_update':
+              statusText.textContent = `Plan updated`;
+              renderPlanPanel(payload);
+              break;
+
+            case 'agent_spawned':
+              statusText.textContent = `Agent "${payload.nickname}" spawned`;
+              appendAgentIndicator(payload.nickname, payload.agent_id);
+              break;
+
             case 'error':
               ensureAssistantMessageBlock();
               const errDiv = document.createElement('div');
@@ -837,6 +847,96 @@ export function finalizeToolCardElement(id: string, name: string, output: string
   if (bodyEl && !isError) {
     bodyEl.classList.add('hidden');
   }
+}
+
+// Floating Plan Panel
+let planPanelVisible = false;
+let planPanelMinimized = false;
+let currentPlanData: { explanation?: string, plan: Array<{ step: string, status: string }> } | null = null;
+
+const planPanel = document.getElementById('plan-panel') as HTMLDivElement;
+const planPanelBody = document.getElementById('plan-panel-body') as HTMLDivElement;
+const planPanelCount = document.getElementById('plan-panel-count') as HTMLSpanElement;
+const planPanelExplanation = document.getElementById('plan-panel-explanation') as HTMLDivElement;
+const planPanelSteps = document.getElementById('plan-panel-steps') as HTMLDivElement;
+const planPanelToggle = document.getElementById('plan-panel-toggle') as HTMLButtonElement;
+const planPanelClose = document.getElementById('plan-panel-close') as HTMLButtonElement;
+
+function getPlanStatusSymbol(status: string): string {
+  switch (status) {
+    case 'completed': return '✔';
+    case 'in_progress': return '◉';
+    default: return '○';
+  }
+}
+
+function getPlanStatusClass(status: string): string {
+  switch (status) {
+    case 'completed': return 'plan-step-completed';
+    case 'in_progress': return 'plan-step-in-progress';
+    default: return 'plan-step-pending';
+  }
+}
+
+function renderPlanPanel(data: { explanation?: string, plan: Array<{ step: string, status: string }> }) {
+  currentPlanData = data;
+  planPanelCount.textContent = `${data.plan.length} step${data.plan.length !== 1 ? 's' : ''}`;
+
+  if (data.explanation) {
+    planPanelExplanation.textContent = data.explanation;
+    planPanelExplanation.classList.remove('hidden');
+  } else {
+    planPanelExplanation.classList.add('hidden');
+  }
+
+  let stepsHtml = '';
+  for (const item of data.plan) {
+    const symbol = getPlanStatusSymbol(item.status);
+    const statusClass = getPlanStatusClass(item.status);
+    stepsHtml += `<div class="plan-step ${statusClass}"><span class="plan-step-icon">${symbol}</span><span class="plan-step-text">${item.step}</span><span class="plan-step-label">${item.status}</span></div>`;
+  }
+  planPanelSteps.innerHTML = stepsHtml;
+
+  planPanel.classList.remove('hidden');
+  planPanelVisible = true;
+}
+
+function togglePlanPanel() {
+  planPanelMinimized = !planPanelMinimized;
+  if (planPanelMinimized) {
+    planPanelBody.classList.add('hidden');
+    planPanel.classList.add('minimized');
+  } else {
+    planPanelBody.classList.remove('hidden');
+    planPanel.classList.remove('minimized');
+  }
+}
+
+function closePlanPanel() {
+  planPanel.classList.add('hidden');
+  planPanelVisible = false;
+  planPanelMinimized = false;
+  currentPlanData = null;
+}
+
+// Agent indicators
+const agentsBar = document.getElementById('agents-bar') as HTMLDivElement;
+const agentsList = document.getElementById('agents-list') as HTMLDivElement;
+const activeAgentIndicators = new Map<string, HTMLSpanElement>();
+
+function appendAgentIndicator(nickname: string, agentId: string) {
+  const tag = document.createElement('span');
+  tag.className = 'agent-tag';
+  tag.textContent = nickname;
+  tag.title = `Agent: ${nickname} (${agentId})`;
+  agentsList.appendChild(tag);
+  activeAgentIndicators.set(agentId, tag);
+  agentsBar.classList.remove('hidden');
+}
+
+function initPlanPanel() {
+  planPanelToggle.addEventListener('click', togglePlanPanel);
+  planPanelClose.addEventListener('click', closePlanPanel);
 }
 
 // GitHub Integration
@@ -1980,9 +2080,26 @@ function renderConversation() {
             item => item.role === 'tool' && item.tool_call_id === tc.id
           );
 
-          createToolCardElement(tcId, tcName, tcArgs);
-          if (matchingToolMsg) {
-            finalizeToolCardElement(tcId, tcName, matchingToolMsg.content);
+          // Render update_plan in the floating panel instead of inline
+          if (tcName === 'update_plan') {
+            try {
+              const argsObj = typeof tcArgs === 'string' ? JSON.parse(tcArgs) : tcArgs;
+              const planData = {
+                explanation: argsObj.explanation || '',
+                plan: (argsObj.plan || []).map((p: any) => ({
+                  step: p.step || 'Untitled step',
+                  status: p.status || 'pending'
+                }))
+              };
+              renderPlanPanel(planData);
+            } catch (e) {
+              // fallback to tool card if parsing fails
+            }
+          } else {
+            createToolCardElement(tcId, tcName, tcArgs);
+            if (matchingToolMsg) {
+              finalizeToolCardElement(tcId, tcName, matchingToolMsg.content);
+            }
           }
         });
       } else if (msg.type === 'tool_call') {
@@ -2326,6 +2443,7 @@ export function setupEventListeners() {
 export async function init() {
   await loadSettings();
   setupEventListeners();
+  initPlanPanel();
   if (chatInput) autoResizeTextarea(chatInput);
   await loadApiModels();
   await refreshGithubStatus();

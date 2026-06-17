@@ -640,6 +640,224 @@ code {
   margin: 0 auto;
 }
 
+.agents-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  margin: 2px 12px;
+  background: #0a0e14;
+  border: 1px solid #1a2634;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.agents-bar-label {
+  color: #6b7a8a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.65rem;
+  flex-shrink: 0;
+}
+
+.agents-list {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.agent-tag {
+  background: linear-gradient(135deg, #1a2a3a, #14202e);
+  color: #8ab4f8;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  border: 1px solid #2a4a6a;
+  white-space: nowrap;
+}
+
+.plan-panel {
+  background: linear-gradient(135deg, #0f1218, #0c0e14);
+  border: 1px solid #2a3040;
+  border-radius: var(--radius-sm);
+  margin: 4px 12px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.plan-panel.minimized {
+  max-height: 38px;
+  overflow: hidden;
+}
+
+.plan-panel-header {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #141a24, #10161e);
+  cursor: pointer;
+  user-select: none;
+}
+
+.plan-panel-header:hover {
+  background: #1a2232;
+}
+
+.plan-panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.plan-panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plan-panel-icon {
+  font-size: 0.85rem;
+}
+
+.plan-panel-title {
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 0.8rem;
+}
+
+.plan-panel-count {
+  background-color: #1e2a3a;
+  color: #8ab4f8;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.plan-panel-toggle,
+.plan-panel-close {
+  background: none;
+  border: none;
+  color: #6b7a8a;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.plan-panel-toggle:hover,
+.plan-panel-close:hover {
+  color: var(--color-text);
+  background: #1e2634;
+}
+
+.plan-panel-body {
+  border-top: 1px solid #1a2230;
+}
+
+.plan-panel-explanation {
+  padding: 6px 12px;
+  color: #8899b0;
+  font-size: 0.75rem;
+  font-style: italic;
+  border-bottom: 1px solid #1a2230;
+  background: #090c12;
+}
+
+.plan-panel-steps {
+  padding: 6px 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.plan-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  margin: 2px 0;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.plan-step:hover {
+  background: #141c28;
+}
+
+.plan-step-icon {
+  width: 18px;
+  text-align: center;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.plan-step-text {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--color-text);
+}
+
+.plan-step-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.plan-step-completed .plan-step-icon {
+  color: #34d399;
+}
+
+.plan-step-completed .plan-step-text {
+  color: #6b7a8a;
+  text-decoration: line-through;
+}
+
+.plan-step-completed .plan-step-label {
+  background: #0a2a1a;
+  color: #34d399;
+}
+
+.plan-step-in-progress .plan-step-icon {
+  color: #60a5fa;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.plan-step-in-progress .plan-step-text {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.plan-step-in-progress .plan-step-label {
+  background: #0a1a3a;
+  color: #60a5fa;
+}
+
+.plan-step-pending .plan-step-icon {
+  color: #4a5568;
+}
+
+.plan-step-pending .plan-step-text {
+  color: #6b7a8a;
+}
+
+.plan-step-pending .plan-step-label {
+  background: #1a1a22;
+  color: #6b7a8a;
+}
+
 .status-spinner {
   width: 14px;
   height: 14px;
@@ -1132,6 +1350,15 @@ textarea#chat-input::placeholder {
 @keyframes rotate {
   100% {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
   }
 }
 

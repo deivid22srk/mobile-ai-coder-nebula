@@ -317,7 +317,7 @@ const DEFAULT_CONFIG = {
   apiKey: '0',
   opencodeZenApiKey: '',
   model: 'qwen-plus',
-  systemPrompt: 'You are *coder (mobile-ai-coder), a powerful agentic AI coding assistant optimized for mobile. You have access to local tools in the workspace: write_file, read_file, list_dir, run_command, git_clone, and (when the user has connected GitHub) github_list_repos, github_create_repo, github_push_files, github_get_user.\n\nUse these tools to help the user. Always explain what you are doing (e.g. "I am going to read the index.html file to inspect its content") right before invoking a tool. Make sure code changes are correct and tested.',
+  systemPrompt: 'You are *coder (mobile-ai-coder), a powerful agentic AI coding assistant optimized for mobile. You have access to local tools in the workspace: write_file, read_file, list_dir, run_command, git_clone, and (when the user has connected GitHub) github_list_repos, github_create_repo, github_push_files, github_get_user.\n\nUse these tools to help the user. Always explain what you are doing (e.g. "I am going to read the index.html file to inspect its content") right before invoking a tool. Make sure code changes are correct and tested.\n\n## Sub-Agents\n\nYou can spawn sub-agents to delegate work using `spawn_agent`. This is useful for:\n- Exploring code in parallel while you plan\n- Delegating large refactoring tasks\n- Running independent investigations\n\nAfter spawning, use `list_agents` to check status and `wait_agent` to get results.\nSub-agents share your workspace and tools but focus only on their assigned task.\n\n## update_plan Tool\n\nYou have access to an `update_plan` tool which tracks steps and progress as a visual checklist for the user.\n\n**When to use a plan:**\n- The task is non-trivial and requires multiple actions\n- There are logical phases or dependencies where sequencing matters\n- The user asked for multiple things in one prompt\n- You generate additional steps while working\n\n**When NOT to use a plan:**\n- Simple or single-step queries you can do immediately\n- Questions or brainstorming that don\'t need code changes\n\n**How to use update_plan:**\n- Create a plan with short 1-sentence steps (max 10 words each)\n- Each step must have a status: `pending`, `in_progress`, or `completed`\n- Exactly one step should be `in_progress` at a time\n- Update the plan as you complete steps: mark finished steps as `completed` and the next step as `in_progress`\n- When all steps are complete, mark all as `completed`\n- Do not jump an item from pending to completed without setting it to in_progress first',
   workspacePath: path.join(__dirname, 'workspace'),
   githubToken: '',
   githubUser: null
@@ -460,6 +460,169 @@ async function refreshSkills() {
 
 function getCachedSkills() {
   return skillsCache.skills;
+}
+
+// Agent registry for sub-agent management
+const agentRegistry = new Map();
+
+function generateAgentNickname() {
+  const names = ['Archimedes', 'Euclid', 'Galileo', 'Einstein', 'Newton', 'Ada', 'Turing', 'Lovelace', 'Faraday', 'Curie', 'Bohr', 'Feynman', 'Planck', 'Tesla', 'Darwin', 'Mendel', 'Pasteur', 'Lavoisier', 'Kepler', 'Copernicus'];
+  const used = new Set(Array.from(agentRegistry.values()).map(a => a.nickname));
+  for (const name of names) {
+    if (!used.has(name)) return name;
+  }
+  return `Agent-${agentRegistry.size + 1}`;
+}
+
+async function runSubAgent(agentId, nickname, task, chatId) {
+  const config = await getConfig();
+  const maxIterations = 10;
+  let messages = [
+    { role: 'system', content: config.systemPrompt + '\n\nYou are a sub-agent tasked with a specific goal. Focus only on your task and report results concisely.' },
+    { role: 'user', content: task }
+  ];
+
+  const entry = agentRegistry.get(agentId);
+  if (!entry) return;
+
+  try {
+    for (let i = 0; i < maxIterations; i++) {
+      if (entry.cancelled) {
+        entry.output = 'Sub-agent was cancelled.';
+        entry.status = 'cancelled';
+        return;
+      }
+
+      entry.status = 'running';
+      const conn = getActiveConnectionInfo(config);
+
+      const response = await fetch(`${conn.apiUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${conn.apiKey}`
+        },
+        body: JSON.stringify({
+          model: config.model,
+          messages: messages,
+          tools: toolsDefinition,
+          tool_choice: 'auto',
+          stream: false
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        entry.output = `Error: LLM API returned ${response.status}: ${errorText}`;
+        entry.status = 'error';
+        return;
+      }
+
+      const data = await response.json();
+      const choice = data.choices?.[0];
+      if (!choice) {
+        entry.output = 'Error: No response from LLM';
+        entry.status = 'error';
+        return;
+      }
+
+      const msg = choice.message;
+      messages.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
+
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        for (const tc of msg.tool_calls) {
+          let args = {};
+          try {
+            args = typeof tc.function.arguments === 'string' ? JSON.parse(tc.function.arguments) : tc.function.arguments;
+          } catch (e) {
+            args = {};
+          }
+
+          let toolOutput = '';
+          try {
+            const name = tc.function.name;
+            switch (name) {
+              case 'list_dir': {
+                const target = resolveWorkspacePath(config.workspacePath, args.relative_path);
+                const files = await fs.readdir(target, { withFileTypes: true });
+                const list = await Promise.all(files.map(async f => {
+                  const absolute = path.join(target, f.name);
+                  let size = 0;
+                  if (f.isFile()) { try { const s = await fs.stat(absolute); size = s.size; } catch (_) {} }
+                  return { name: f.name, isDirectory: f.isDirectory(), size };
+                }));
+                toolOutput = JSON.stringify(list);
+                break;
+              }
+              case 'read_file': {
+                const fp = resolveWorkspacePath(config.workspacePath, args.relative_path);
+                toolOutput = await fs.readFile(fp, 'utf-8');
+                break;
+              }
+              case 'write_file': {
+                const fp = resolveWorkspacePath(config.workspacePath, args.relative_path);
+                await fs.mkdir(path.dirname(fp), { recursive: true });
+                await fs.writeFile(fp, args.content || '', 'utf-8');
+                toolOutput = `Successfully wrote to ${args.relative_path}`;
+                break;
+              }
+              case 'run_command': {
+                const { spawn } = require('child_process');
+                toolOutput = await new Promise((resolve, reject) => {
+                  const child = spawn('sh', ['-c', args.command], { cwd: config.workspacePath, shell: false, timeout: 60000 });
+                  let out = '';
+                  child.stdout.on('data', d => out += d.toString());
+                  child.stderr.on('data', d => out += d.toString());
+                  child.on('close', code => resolve(out + (code !== 0 ? `\nExit code: ${code}` : '')));
+                  child.on('error', reject);
+                });
+                break;
+              }
+              case 'git_clone': {
+                const cmd = args.relative_path ? `git clone "${args.repo_url}" "${args.relative_path}"` : `git clone "${args.repo_url}"`;
+                const { spawn } = require('child_process');
+                toolOutput = await new Promise((resolve, reject) => {
+                  const child = spawn('sh', ['-c', cmd], { cwd: config.workspacePath, shell: false, timeout: 180000 });
+                  let out = '';
+                  child.stdout.on('data', d => out += d.toString());
+                  child.stderr.on('data', d => out += d.toString());
+                  child.on('close', code => resolve(out + (code !== 0 ? `\nExit code: ${code}` : '')));
+                  child.on('error', reject);
+                });
+                break;
+              }
+              case 'memory_save': {
+                const mem = db.saveMemory(chatId, args.name || 'unnamed', args.content || '', args.scope || 'global', args.type || 'fact', args.tags || '');
+                toolOutput = JSON.stringify({ success: true, memory: mem });
+                break;
+              }
+              case 'memory_search': {
+                const results = db.searchMemories(args.query || '');
+                toolOutput = JSON.stringify({ success: true, results });
+                break;
+              }
+              default:
+                toolOutput = `Tool ${name} is not available to sub-agents.`;
+            }
+          } catch (toolErr) {
+            toolOutput = `Error: ${toolErr.message}`;
+          }
+
+          messages.push({ role: 'tool', tool_call_id: tc.id, name: tc.function.name, content: toolOutput });
+        }
+      } else {
+        // No tool calls - agent finished its task
+        entry.output = msg.content || 'Task completed.';
+        entry.status = 'completed';
+        return;
+      }
+    }
+    entry.output = 'Sub-agent reached maximum iterations without completing.';
+    entry.status = 'completed';
+  } catch (err) {
+    entry.output = `Error: ${err.message}`;
+    entry.status = 'error';
+  }
 }
 
 // GitHub API helper — used both by tools and /api/github/* endpoints
@@ -740,6 +903,77 @@ const toolsDefinition = [
           name: { type: 'string', description: 'The skill name to load.' }
         },
         required: ['name']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'spawn_agent',
+      description: 'Spawns a sub-agent to work on a specific task in the background. Use this to delegate work (e.g. explore code, refactor a module) while you continue with other tasks.',
+      parameters: {
+        type: 'object',
+        properties: {
+          task: {
+            type: 'string',
+            description: 'Clear, specific task description for the sub-agent. Include file paths, requirements, and expected output format.'
+          }
+        },
+        required: ['task']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_agents',
+      description: 'Lists all active sub-agents and their current status (running, completed, error, cancelled).',
+      parameters: { type: 'object', properties: {} }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'wait_agent',
+      description: 'Waits for a sub-agent to complete and returns its final output. Use this after spawning an agent to get results.',
+      parameters: {
+        type: 'object',
+        properties: {
+          agent_id: {
+            type: 'string',
+            description: 'The agent_id returned by spawn_agent.'
+          }
+        },
+        required: ['agent_id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_plan',
+      description: 'Create or update a step-by-step plan with status tracking. Shows a visual checklist to the user. Use this for multi-step tasks to show your approach and progress.',
+      parameters: {
+        type: 'object',
+        properties: {
+          explanation: {
+            type: 'string',
+            description: 'Optional explanation of what this plan covers or what changed since the last update.'
+          },
+          plan: {
+            type: 'array',
+            description: 'List of steps in the plan with their current status.',
+            items: {
+              type: 'object',
+              properties: {
+                step: { type: 'string', description: 'Brief step description (max 10 words).' },
+                status: { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Current status of this step.' }
+              },
+              required: ['step', 'status']
+            }
+          }
+        },
+        required: ['plan']
       }
     }
   }
@@ -1847,6 +2081,77 @@ async function runAgentExecution(chatId, clientMessages) {
                     toolOutput = `--- Full instructions for "${skill.name}" ---\n${skill.content}\n--- End of "${skill.name}" instructions ---`;
                     skillReadCache[skill.name] = true;
                   }
+                  break;
+                }
+                case 'spawn_agent': {
+                  const agentId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                  const nickname = generateAgentNickname();
+                  const task = args.task || 'No task specified.';
+                  agentRegistry.set(agentId, { nickname, task, status: 'pending', output: '', cancelled: false });
+                  runSubAgent(agentId, nickname, task, chatId);
+                  toolOutput = JSON.stringify({
+                    success: true,
+                    agent_id: agentId,
+                    nickname: nickname,
+                    status: 'running',
+                    message: `Sub-agent "${nickname}" spawned and working on: ${task.slice(0, 100)}${task.length > 100 ? '...' : ''}`
+                  });
+                  broadcastEvent('agent_spawned', { agent_id: agentId, nickname, task: task.slice(0, 200) });
+                  break;
+                }
+                case 'list_agents': {
+                  const agents = Array.from(agentRegistry.entries()).map(([id, a]) => ({
+                    agent_id: id,
+                    nickname: a.nickname,
+                    status: a.status,
+                    task: a.task.slice(0, 150)
+                  }));
+                  toolOutput = JSON.stringify({ success: true, agents });
+                  break;
+                }
+                case 'wait_agent': {
+                  const agentId = args.agent_id;
+                  const entry = agentRegistry.get(agentId);
+                  if (!entry) {
+                    toolOutput = JSON.stringify({ error: `Agent "${agentId}" not found.` });
+                    break;
+                  }
+                  // Poll until agent completes (max 5 minutes)
+                  const startTime = Date.now();
+                  const timeout = 300000;
+                  while (entry.status === 'pending' || entry.status === 'running') {
+                    if (Date.now() - startTime > timeout) {
+                      toolOutput = JSON.stringify({ error: 'Timeout waiting for sub-agent.', agent_id: agentId, nickname: entry.nickname });
+                      break;
+                    }
+                    await new Promise(r => setTimeout(r, 1000));
+                  }
+                  if (toolOutput) break;
+                  toolOutput = JSON.stringify({
+                    success: true,
+                    agent_id: agentId,
+                    nickname: entry.nickname,
+                    status: entry.status,
+                    output: entry.output
+                  });
+                  break;
+                }
+                case 'update_plan': {
+                  const planData = {
+                    explanation: args.explanation || '',
+                    plan: (args.plan || []).map(p => ({
+                      step: p.step || 'Untitled step',
+                      status: p.status || 'pending'
+                    }))
+                  };
+                  broadcastEvent('plan_update', planData);
+                  const total = planData.plan.length;
+                  const completed = planData.plan.filter(p => p.status === 'completed').length;
+                  const inProgress = planData.plan.filter(p => p.status === 'in_progress').length;
+                  toolOutput = JSON.stringify({
+                    success: true,
+                    summary: `Plan updated: ${completed}/${total} steps completed, ${inProgress} in progress.`
+                  });
                   break;
                 }
                 default:

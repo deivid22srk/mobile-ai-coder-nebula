@@ -121,6 +121,34 @@
           </div>
         </div>
       </div>
+      <!-- Active Agents Bar -->
+      <div id="agents-bar" class="agents-bar hidden">
+        <span class="agents-bar-label">Agents:</span>
+        <div id="agents-list" class="agents-list"></div>
+      </div>
+
+      <!-- Floating Plan Panel -->
+      <div id="plan-panel" class="plan-panel hidden">
+        <div class="plan-panel-header" id="plan-panel-header">
+          <div class="plan-panel-header-left">
+            <span class="plan-panel-icon">📋</span>
+            <span class="plan-panel-title">Plan</span>
+            <span class="plan-panel-count" id="plan-panel-count">0 steps</span>
+          </div>
+          <div class="plan-panel-header-right">
+            <button id="plan-panel-toggle" class="plan-panel-toggle" title="Toggle plan visibility">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            </button>
+            <button id="plan-panel-close" class="plan-panel-close" title="Close plan">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        </div>
+        <div class="plan-panel-body" id="plan-panel-body">
+          <div class="plan-panel-explanation" id="plan-panel-explanation"></div>
+          <div class="plan-panel-steps" id="plan-panel-steps"></div>
+        </div>
+      </div>
       <div class="input-row">
         <span class="prompt-arrow">&gt;</span>
         <textarea id="chat-input" placeholder="Type a command or ask a question..." rows="1"></textarea>
