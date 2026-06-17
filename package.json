@@ -6,9 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "build": "esbuild src/main.ts --bundle --outfile=public/bundle.js --minify --sourcemap",
-    "watch": "esbuild src/main.ts --bundle --outfile=public/bundle.js --watch"
+    "watch": "esbuild src/main.ts --bundle --outfile=public/bundle.js --watch",
+    "tui": "node tui.js"
   },
   "dependencies": {
+    "blessed": "^0.1.81",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "highlight.js": "^11.11.1",
