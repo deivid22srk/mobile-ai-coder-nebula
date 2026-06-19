@@ -44,9 +44,13 @@ Esta versão forkada substitui a interface original (TypeScript vanilla + HTML/C
 ### Instalação e execução (um comando só)
 
 ```bash
+git clone https://github.com/deivid22srk/mobile-ai-coder-nebula.git
+cd mobile-ai-coder-nebula
 npm install
 npm run dev
 ```
+
+> 💡 O `npm install` na raiz **também instala automaticamente** as dependências do `web-ui/` (via hook `postinstall`). Em seguida, `npm run dev` sobe os dois servidores em paralelo com `concurrently`.
 
 Esse comando usa `concurrently` para subir, em paralelo:
 
@@ -61,7 +65,7 @@ Abra **http://localhost:5173** no navegador.
 
 | Script               | O que faz                                                        |
 |----------------------|------------------------------------------------------------------|
-| `npm run dev`        | Sobe backend (3000) + Vite (5173) juntos com logs coloridos      |
+| `npm run dev`        | Sobe backend (3000) + Vite (5173) juntos com logs colorizados    |
 | `npm start`          | Sobe apenas o backend Node                                       |
 | `npm run start:web`  | Sobe apenas o Vite (a interface não vai ter backend pra falar)   |
 | `npm run build`      | Build do bundle TypeScript legado (esbuild → public/bundle.js)   |
