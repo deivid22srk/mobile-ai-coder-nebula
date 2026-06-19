@@ -94,11 +94,19 @@ export default function SettingsScreen({ config, onClose, onSaved }: SettingsPro
     try {
       // Save settings first so backend uses the latest credentials
       await api.saveSettings(draft);
-      const models = await api.listModels();
-      if (models.length > 0) {
-        setTestStatus({ kind: 'success', text: `Conexão OK — ${models.length} modelos disponíveis` });
-      } else {
+      const result = await api.listModels();
+      if (result.success && result.models.length > 0) {
+        setTestStatus({
+          kind: 'success',
+          text: `Conexão OK — ${result.models.length} modelos disponíveis${result.cached ? ' (cache)' : ''}`
+        });
+      } else if (result.success && result.models.length === 0) {
         setTestStatus({ kind: 'error', text: 'Conexão OK mas nenhum modelo retornado' });
+      } else {
+        setTestStatus({
+          kind: 'error',
+          text: result.error || `Falha: ${result.errorCode || 'erro desconhecido'}`
+        });
       }
     } catch (err: any) {
       setTestStatus({ kind: 'error', text: err.message || 'Falha na conexão' });

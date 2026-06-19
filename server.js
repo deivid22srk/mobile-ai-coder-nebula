@@ -1445,40 +1445,138 @@ app.post('/api/terminal/run', async (req, res) => {
   }
 });
 
-// Get models from OpenAI endpoint
+// Get models from the active provider endpoint.
+// Includes a 5-minute in-memory cache to avoid hammering the upstream API.
+// Returns a structured error code so the frontend can render appropriate UX.
+const MODELS_CACHE = { provider: null, key: null, data: null, timestamp: 0, ttl: 5 * 60 * 1000 };
+
 app.get('/api/models', async (req, res) => {
   try {
     const config = await getConfig();
     const conn = getActiveConnectionInfo(config);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-    const apiResponse = await fetch(`${conn.apiUrl}/models`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${conn.apiKey}`
-      },
-      signal: controller.signal
-    });
+    // Validate connection info before attempting fetch — produces a friendly
+    // error message instead of "Failed to parse URL from /models".
+    if (!conn.apiUrl) {
+      return res.json({
+        success: false,
+        errorCode: 'NO_API_URL',
+        error: 'Nenhuma API URL configurada. Abra Configurações → LLM & Provider e preencha os campos.',
+        provider: config.provider || 'custom',
+        models: []
+      });
+    }
+
+    // Cache hit (same provider + same key fingerprint)
+    const keyFingerprint = (conn.apiKey || '').slice(0, 8);
+    const cacheKey = `${config.provider || 'custom'}:${keyFingerprint}`;
+    if (
+      MODELS_CACHE.data &&
+      MODELS_CACHE.key === cacheKey &&
+      (Date.now() - MODELS_CACHE.timestamp) < MODELS_CACHE.ttl
+    ) {
+      return res.json({
+        success: true,
+        models: MODELS_CACHE.data,
+        cached: true,
+        provider: config.provider || 'custom'
+      });
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    let apiResponse;
+    try {
+      apiResponse = await fetch(`${conn.apiUrl}/models`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${conn.apiKey || ''}`,
+          'Accept': 'application/json',
+          'User-Agent': 'mobile-ai-coder/1.0'
+        },
+        signal: controller.signal
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      const msg = fetchErr.name === 'AbortError'
+        ? 'Timeout ao contatar a API (10s). Verifique se a API URL está acessível.'
+        : `Falha de rede ao buscar modelos: ${fetchErr.message}`;
+      return res.json({
+        success: false,
+        errorCode: 'NETWORK_ERROR',
+        error: msg,
+        provider: config.provider || 'custom',
+        models: []
+      });
+    }
 
     clearTimeout(timeoutId);
 
     if (!apiResponse.ok) {
-      throw new Error(`Models API returned status ${apiResponse.status}`);
+      let detail = '';
+      try { detail = await apiResponse.text(); } catch (_) {}
+      return res.json({
+        success: false,
+        errorCode: apiResponse.status === 401 || apiResponse.status === 403 ? 'AUTH_FAILED' : 'HTTP_ERROR',
+        error: `API retornou status ${apiResponse.status}${detail ? ': ' + detail.slice(0, 200) : ''}`,
+        status: apiResponse.status,
+        provider: config.provider || 'custom',
+        models: []
+      });
     }
 
     const data = await apiResponse.json();
-    // Format is usually { data: [ { id: '...', ... } ] }
-    const models = data.data ? data.data.map(m => m.id) : [];
-    res.json({ success: true, models: models.sort() });
+    // OpenAI-compatible format: { data: [ { id: '...', ... } ] }
+    // Some providers return a bare array — handle both.
+    const rawModels = Array.isArray(data) ? data : (data.data || data.models || []);
+    const models = rawModels
+      .map(m => typeof m === 'string' ? m : (m.id || m.name))
+      .filter(Boolean)
+      .sort();
+
+    // Update cache
+    MODELS_CACHE.provider = config.provider || 'custom';
+    MODELS_CACHE.key = cacheKey;
+    MODELS_CACHE.data = models;
+    MODELS_CACHE.timestamp = Date.now();
+
+    res.json({
+      success: true,
+      models,
+      provider: config.provider || 'custom'
+    });
   } catch (err) {
     console.error("Error fetching models:", err.message);
-    // Standard fallbacks if request fails (e.g. offline, proxy issues, key not set yet)
-    res.json({ 
-      success: false, 
+    res.json({
+      success: false,
+      errorCode: 'INTERNAL_ERROR',
       error: err.message,
-      models: ['qwen-plus', 'qwen-turbo', 'qwen-max', 'gpt-4o-mini', 'gpt-4o', 'deepseek-coder'] 
+      models: []
     });
+  }
+});
+
+// Health check endpoint — useful for the frontend to verify the backend is alive
+// and surface config status without leaking secrets.
+app.get('/api/health', async (req, res) => {
+  try {
+    const config = await getConfig();
+    const conn = getActiveConnectionInfo(config);
+    res.json({
+      ok: true,
+      version: '1.0.0',
+      provider: config.provider || 'custom',
+      hasApiUrl: Boolean(conn.apiUrl && conn.apiUrl.trim()),
+      hasApiKey: Boolean(conn.apiKey && conn.apiKey !== '0' && conn.apiKey.trim()),
+      model: config.model || null,
+      workspacePath: config.workspacePath || null,
+      githubConnected: Boolean(config.githubToken),
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -1699,13 +1797,31 @@ async function runAgentExecution(chatId, clientMessages) {
         // Guard: cancelled right before fetch
         if (execution.cancelled) break;
 
+        // Pre-flight validation: produce a friendly error instead of
+        // "Failed to parse URL from /chat/completions" when apiUrl is empty.
+        if (!conn.apiUrl) {
+          broadcastEvent('error', {
+            content: 'IA não configurada. Abra Configurações → LLM & Provider, preencha API URL e API Key e clique em Salvar.'
+          });
+          broadcastEvent('done', { chatId });
+          break;
+        }
+        if (!conn.apiKey || conn.apiKey === '0') {
+          broadcastEvent('error', {
+            content: 'API Key ausente. Abra Configurações → LLM & Provider e informe sua chave de API.'
+          });
+          broadcastEvent('done', { chatId });
+          break;
+        }
+
         let apiResponse;
         try {
           apiResponse = await fetch(`${conn.apiUrl}/chat/completions`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${conn.apiKey}`
+              'Authorization': `Bearer ${conn.apiKey}`,
+              'Accept': 'text/event-stream'
             },
             body: JSON.stringify({
               model: config.model,

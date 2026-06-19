@@ -63,9 +63,31 @@ export const api = {
   },
 
   // Models
-  async listModels(): Promise<string[]> {
-    const data = await jsonOrThrow<{ models: string[] }>(await fetch('/api/models'));
-    return data.models;
+  async listModels(): Promise<{
+    success: boolean;
+    models: string[];
+    provider?: string;
+    cached?: boolean;
+    errorCode?: string;
+    error?: string;
+  }> {
+    return jsonOrThrow(await fetch('/api/models'));
+  },
+
+  // Health check
+  async health(): Promise<{
+    ok: boolean;
+    version: string;
+    provider: string;
+    hasApiUrl: boolean;
+    hasApiKey: boolean;
+    model: string | null;
+    workspacePath: string | null;
+    githubConnected: boolean;
+    uptime: number;
+    timestamp: string;
+  }> {
+    return jsonOrThrow(await fetch('/api/health'));
   },
 
   // Skills

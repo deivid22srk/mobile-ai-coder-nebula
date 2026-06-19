@@ -11,6 +11,7 @@ import type {
 
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
+import { ToastContainer, toast } from './components/Toast';
 import Composer from './components/Composer';
 import MessageList from './components/MessageList';
 import SettingsScreen from './components/SettingsScreen';
@@ -326,9 +327,12 @@ export default function App() {
               }
               return next;
             });
+            // Show toast for visibility (especially when error is about config)
+            toast('error', 'Erro do agente', evt.content, 6000);
             break;
           case 'cancelled':
-            setStatusText('Cancelled');
+            setStatusText('Cancelado');
+            toast('info', 'Geração cancelada', undefined, 2500);
             break;
           case 'done':
             setStatusText('');
@@ -510,6 +514,8 @@ export default function App() {
           onClose={() => setShowTerminal(false)}
         />
       )}
+
+      <ToastContainer />
     </div>
   );
 }

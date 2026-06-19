@@ -2232,7 +2232,266 @@ a:hover {
   }
 }
 
-/* Utility */
+/* ============================================================
+   Premium polish — micro-interactions, skeleton loaders, toasts
+   ============================================================ */
+
+/* Smooth focus rings everywhere */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-violet);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Subtle scale on click for primary buttons */
+.btn-primary:active,
+.mini-btn.primary:active,
+.sidebar-new-chat:active,
+.send-btn:active {
+  transform: scale(0.97);
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 0%,
+    var(--bg-hover) 50%,
+    var(--bg-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-line {
+  height: 12px;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.skeleton-line.short { width: 60%; }
+.skeleton-line.medium { width: 80%; }
+
+/* Fade-in animation utility */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeInUp 0.25s var(--ease-out);
+}
+
+/* Toast notifications */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 260px;
+  max-width: 380px;
+  pointer-events: auto;
+  animation: toastIn 0.3s var(--ease-out);
+}
+
+.toast.exit {
+  animation: toastOut 0.25s var(--ease-out) forwards;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(40px); }
+}
+
+.toast.success {
+  border-left: 3px solid var(--status-success);
+}
+
+.toast.error {
+  border-left: 3px solid var(--status-error);
+}
+
+.toast.info {
+  border-left: 3px solid var(--status-info);
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.toast.success .toast-icon { background: var(--status-success-soft); color: var(--status-success); }
+.toast.error .toast-icon { background: var(--status-error-soft); color: var(--status-error); }
+.toast.info .toast-icon { background: var(--status-info-soft); color: var(--status-info); }
+
+.toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-weight: 600;
+  margin-bottom: 1px;
+}
+
+.toast-message {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Subtle ambient grid pattern on the welcome screen */
+.welcome-state::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(124, 92, 252, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 92, 252, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(circle at center, black 0%, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle at center, black 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.welcome-state {
+  position: relative;
+}
+
+/* Pulsing status dot for streaming */
+.status-dot {
+  position: relative;
+}
+
+.status-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: var(--accent-violet);
+  opacity: 0.4;
+  animation: ping 1.5s ease-out infinite;
+}
+
+@keyframes ping {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+/* Better scrollbar for model list and code blocks */
+.model-list::-webkit-scrollbar {
+  width: 4px;
+}
+.model-list::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+/* Subtle hover lift on cards */
+.tool-card,
+.list-item,
+.welcome-prompt,
+.plan-panel {
+  transition: all 0.18s var(--ease-out);
+}
+
+/* Make the model trigger pulse subtly when no API configured */
+.model-trigger.unconfigured {
+  border-color: var(--status-warning);
+  color: var(--status-warning);
+}
+
+.model-trigger.unconfigured .model-dot {
+  background: var(--status-warning);
+  box-shadow: 0 0 8px var(--status-warning);
+}
+
+/* Provider badge in header */
+.provider-badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-violet-soft);
+  color: var(--accent-violet);
+  border: 1px solid var(--border-accent);
+  margin-left: 6px;
+}
+
+.provider-badge.custom {
+  background: rgba(96, 165, 250, 0.14);
+  color: var(--status-info);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+/* Health status pill (used in header tooltip) */
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--status-success-soft);
+  color: var(--status-success);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.health-pill.warning {
+  background: var(--status-warning-soft);
+  color: var(--status-warning);
+  border-color: rgba(251, 191, 36, 0.25);
+}
+
+.health-pill.error {
+  background: var(--status-error-soft);
+  color: var(--status-error);
+  border-color: rgba(248, 113, 113, 0.25);
+}
+
+/* ============================================================
+   Utility
+   ============================================================ */
 .hidden { display: none !important; }
 .flex-1 { flex: 1; }
 .mono { font-family: var(--font-mono); }

@@ -18,6 +18,18 @@ export default function Header({
   onOpenExplorer,
   onOpenSettings
 }: HeaderProps) {
+  const isConfigured = Boolean(
+    config &&
+    (
+      config.provider === 'opencode-zen'
+        ? config.opencodeZenApiKey && config.opencodeZenApiKey.trim()
+        : config.apiUrl && config.apiUrl.trim() && config.apiKey && config.apiKey !== '0'
+    )
+  );
+
+  const providerLabel = config?.provider === 'opencode-zen' ? 'Zen' : 'Custom';
+  const providerClass = config?.provider === 'opencode-zen' ? '' : 'custom';
+
   return (
     <header className="app-header">
       <div className="header-left">
@@ -41,11 +53,16 @@ export default function Header({
       </div>
 
       <div className="header-center">
-        <button className="model-trigger" onClick={onOpenModelPicker} title="Selecionar modelo">
+        <button
+          className={`model-trigger ${isConfigured ? '' : 'unconfigured'}`}
+          onClick={onOpenModelPicker}
+          title={isConfigured ? 'Selecionar modelo' : 'IA não configurada — clique para configurar'}
+        >
           <span className="model-dot" />
           <span className="model-name">
             {config?.model || 'Selecionar modelo'}
           </span>
+          <span className={`provider-badge ${providerClass}`}>{providerLabel}</span>
           <Icon name="chevron-down" size={14} />
         </button>
       </div>
@@ -74,6 +91,7 @@ export default function Header({
           aria-label="Configurações"
         >
           <Icon name="settings" size={18} />
+          {!isConfigured && <span className="badge" style={{ background: 'var(--status-warning)', boxShadow: '0 0 6px var(--status-warning)' }} />}
         </button>
       </div>
 
