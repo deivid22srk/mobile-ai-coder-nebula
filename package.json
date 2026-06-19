@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:web": "cd web-ui && npx vite --host 0.0.0.0 --port 5173",
+    "dev": "concurrently -n backend,web -c magenta,cyan \"npm:start\" \"npm:start:web\"",
     "build": "esbuild src/main.ts --bundle --outfile=public/bundle.js --minify --sourcemap",
+    "build:web": "cd web-ui && npx vite build",
     "watch": "esbuild src/main.ts --bundle --outfile=public/bundle.js --watch",
     "tui": "node tui.js"
   },
@@ -17,6 +20,7 @@
     "sql.js": "^1.11.0"
   },
   "devDependencies": {
+    "concurrently": "^9.2.3",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3"
   },

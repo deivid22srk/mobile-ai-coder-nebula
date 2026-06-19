@@ -1,133 +1,125 @@
-# Mobile AI Coder
+# Nebula Coder (Mobile AI Coder)
 
-Mobile AI Coder is a **powerful agentic AI coding assistant** that runs entirely on your device (including Termux on Android). It connects to any OpenAI-compatible API and provides a premium dark-themed chat interface where an AI agent can read/write files, execute commands, and manage GitHub repositories.
+Um **agente de codificação com IA** que roda inteiramente no seu dispositivo (incluindo Termux no Android). Conecta-se a qualquer endpoint compatível com OpenAI e oferece uma interface web premium onde o agente pode ler/escrever arquivos, executar comandos e gerenciar repositórios GitHub.
 
-Includes a **TUI (Terminal User Interface)** for easy server management directly from the terminal.
-
-[🇧🇷 Ver versão em Português](#português)
+Esta versão forkada substitui a interface original (TypeScript vanilla + HTML/CSS) por uma **interface totalmente nova em React + Vite + TypeScript** com estética moderna (paleta navy + violeta + ciano, inspirada em Linear / Vercel / Cursor).
 
 ---
 
-## 🚀 Key Features
+## ✨ Destaques
 
-- **Chat History & Persistence** — All your conversations are saved locally in a SQLite database. Create new chats, switch between previous sessions, and never lose your context.
-- **TypeScript Frontend** — The entire web interface has been migrated to TypeScript for better maintainability and type safety.
-- **Categorized Settings** — A dedicated configuration screen organized into logical subcategories (LLM Config, GitHub, General, and Tools).
-- **Multiple Providers** — Supports both OpenAI-compatible endpoints and Opencode Zen with easy switching.
-- **Real-Time LLM Streaming** — Token-by-token text and reasoning display using Server-Sent Events (SSE).
-- **Thinking Extraction** — Supports native `reasoning_content`, `<think>` tags (DeepSeek-R1), and `<thought>` tags.
-- **GitHub-Powered Agent** — Dedicated tools (`github_get_user`, `github_list_repos`, `github_create_repo`, `github_push_files`) to manage your repositories directly from the chat.
-- **Background Process Management** — Server commands (like `npm run dev`) are automatically detected and run in the background.
-- **TUI Launcher** — Terminal interface to start/stop the server, check for updates, and install dependencies with a single command.
-
----
-
-## 🛠 Tech Stack
-
-- **Backend**: Node.js + Express
-- **Persistence**: Portable SQLite-based storage.
-- **Frontend**: TypeScript + Vanilla HTML/CSS
-- **Bundler**: `esbuild` for ultra-fast builds.
-- **Fonts**: Outfit (UI) + JetBrains Mono (code).
-- **Communication**: Server-Sent Events (SSE).
-- **TUI**: `blessed` — terminal UI library.
+- **Interface Nova em React + Vite** — "Nebula UI" com design system próprio (Inter + JetBrains Mono, gradientes violeta→ciano, dark navy)
+- **Chat com streaming SSE em tempo real** — texto, raciocínio (reasoning), chamadas de ferramenta e planos, tudo token-a-token
+- **Histórico de conversas persistente** em SQLite (chats agrupados por recência na sidebar)
+- **Cards de tool call expansíveis** mostrando args e output de cada ferramenta invocada
+- **Painel de plano** com barra de progresso mostrando os passos do agente
+- **Sub-agentes** spawnados em background com chips visuais
+- **Skills** carregadas de `.mobile-ai-coder/skills/` (criação, importação via URL, catálogo OpenAI)
+- **Memória persistente** global ou por chat
+- **Integração GitHub** — conectar conta, listar/criar repos, push de arquivos
+- **File Explorer** com árvore + editor inline
+- **Terminal manual** no workspace
+- **Múltiplos providers** — Custom OpenAI-compatível ou Opencode Zen
 
 ---
 
-## 📦 Getting Started
+## 🛠 Stack
 
-### Prerequisites
+| Camada      | Tecnologia                                            |
+|-------------|-------------------------------------------------------|
+| Backend     | Node.js + Express                                     |
+| Persistência| SQLite (via `sql.js`)                                 |
+| Frontend    | React 19 + TypeScript + Vite                          |
+| Estilos     | CSS vanilla com design tokens (sem framework)         |
+| Streaming   | Server-Sent Events (SSE)                              |
+| Fontes      | Inter (UI) + JetBrains Mono (código)                  |
 
-- [Node.js](https://nodejs.org/) (v18 or higher recommended).
+---
 
-### Quick Install (one-liner)
+## 🚀 Como rodar
+
+### Pré-requisitos
+- Node.js v18+
+
+### Instalação e execução (um comando só)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/deivid22srk/mobile-ai-coder/main/install.sh | bash
-```
-
-This clones the repo, installs dependencies, and configures the **`coder`** command in your `~/.bashrc`. After that, just type `coder` anywhere to launch the TUI.
-
-### Manual Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/deivid22srk/mobile-ai-coder.git
-cd mobile-ai-coder
-
-# Install dependencies
 npm install
-
-# Build the frontend assets
-npm run build
-
-# Start the server
-npm start
+npm run dev
 ```
 
-Open **http://localhost:3000** in your browser.
+Esse comando usa `concurrently` para subir, em paralelo:
+
+| Serviço | URL                    | Descrição                              |
+|---------|------------------------|----------------------------------------|
+| Backend | http://localhost:3000  | API Express + SQLite + agente SSE      |
+| Web UI  | http://localhost:5173  | Vite dev server com a interface Nebula |
+
+Abra **http://localhost:5173** no navegador.
+
+### Scripts disponíveis
+
+| Script               | O que faz                                                        |
+|----------------------|------------------------------------------------------------------|
+| `npm run dev`        | Sobe backend (3000) + Vite (5173) juntos com logs coloridos      |
+| `npm start`          | Sobe apenas o backend Node                                       |
+| `npm run start:web`  | Sobe apenas o Vite (a interface não vai ter backend pra falar)   |
+| `npm run build`      | Build do bundle TypeScript legado (esbuild → public/bundle.js)   |
+| `npm run build:web`  | Build de produção da interface React (gera web-ui/dist)          |
+| `npm run tui`        | Abre a TUI em terminal (gerenciador do servidor)                 |
 
 ---
 
-## 💻 TUI Launcher
+## ⚙️ Configuração
 
-The TUI provides a terminal-based menu to manage the server without remembering commands.
+Na primeira execução, abre a tela de **Configurações** (ícone de engrenagem no header) e configura:
 
-| Command | Description |
-|---|---|
-| `coder` | Launch the TUI from anywhere (after running install.sh) |
-| `npm run tui` | Alternative way to launch the TUI |
+| Campo           | Default        | Descrição                                            |
+|-----------------|----------------|------------------------------------------------------|
+| `provider`      | `custom`       | `custom` (OpenAI-compatível) ou `opencode-zen`       |
+| `apiUrl`        | *(vazio)*      | Endpoint base (ex: `https://api.openai.com/v1`)      |
+| `apiKey`        | *(vazio)*      | Sua API key do LLM                                   |
+| `model`         | `qwen-plus`    | Nome do modelo (use o picker para ver a lista)       |
+| `workspacePath` | `./workspace`  | Pasta sandbox onde o agente lê/escreve arquivos      |
+| `githubToken`   | *(vazio)*      | PAT para habilitar as ferramentas `github_*`         |
 
-### TUI Options
-
-- **▶ Start Server** — starts the backend. Changes to **Stop Server** when running.
-- **◖ Check for Updates** — fetches and pulls the latest changes from GitHub.
-- **⚡ Install Dependencies** — shown when `node_modules` is missing.
-- **✕ Exit** — stops the server and quits.
-
-Navigate with **Tab** / **Arrow keys** / **Enter**, or click with your mouse.
+As configs são persistidas em `config.json` (não commitado).
 
 ---
 
-## ⚙️ Configuration
+## 🧩 Estrutura do projeto
 
-On first launch, the app creates a `config.json` with defaults. You can change all settings via the ⚙️ gear icon in the app.
-
-| Setting | Default | Description |
-|---|---|---|
-| `apiUrl` | *(empty)* | OpenAI-compatible API endpoint |
-| `apiKey` | `0` | API authentication key |
-| `model` | `qwen-plus` | Default LLM model |
-| `workspacePath` | `./workspace` | Sandboxed directory for file operations |
-| `systemPrompt` | *(built-in)* | Agent system instructions |
-| `githubToken` | *(empty)* | GitHub PAT for unlocking `github_*` tools |
-
----
-
-## 🇧🇷 Português
-
-O **Mobile AI Coder** é um assistente de codificação agente local que roda inteiramente no seu dispositivo.
-
-### Destaques:
-- **Histórico de Chat** — Todas as conversas são salvas automaticamente. Continue de onde parou.
-- **Interface em TypeScript** — Código mais robusto e fácil de manter.
-- **Configurações Categorizadas** — Telas específicas para LLM, GitHub, Geral e Ferramentas.
-- **Múltiplos Providers** — Suporte a endpoints OpenAI-compatíveis e Opencode Zen.
-- **TUI (Interface de Terminal)** — Gerencie o servidor com um menu interativo.
-
-### Instalação rápida
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/deivid22srk/mobile-ai-coder/main/install.sh | bash
+```
+mobile-ai-coder/
+├── server.js              # Backend Express + agente SSE
+├── tui.js                 # TUI em terminal (blessed)
+├── src/                   # Frontend legado (esbuild → public/bundle.js)
+├── public/                # Assets estáticos do frontend legado
+├── web-ui/                # ⭐ Nova interface React + Vite
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── api.ts         # Cliente HTTP/SSE para o backend
+│   │   ├── types.ts
+│   │   ├── markdown.ts    # Renderer markdown leve
+│   │   ├── index.css      # Design system Nebula (CSS puro)
+│   │   └── components/
+│   │       ├── Header.tsx
+│   │       ├── Sidebar.tsx
+│   │       ├── Composer.tsx
+│   │       ├── MessageList.tsx
+│   │       ├── SettingsScreen.tsx
+│   │       ├── ModelPickerModal.tsx
+│   │       ├── ExplorerModal.tsx
+│   │       ├── TerminalModal.tsx
+│   │       └── Icon.tsx
+│   └── vite.config.ts     # Proxy /api → http://localhost:3000
+├── database.sqlite        # Banco local (não commitado)
+├── config.json            # Configurações (não commitado)
+└── workspace/             # Sandbox do agente (não commitado)
 ```
 
-### Como rodar manualmente:
-1. `npm install`
-2. `npm run build`
-3. `npm start`
-
 ---
 
-## 📄 License
+## 📄 Licença
 
-MIT License — use, modify, and distribute freely.
+MIT — use, modifique e distribua livremente.
