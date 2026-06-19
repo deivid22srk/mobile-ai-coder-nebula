@@ -9,6 +9,7 @@
     "predev": "node scripts/ensure-web-deps.js",
     "dev": "concurrently -n backend,web -c magenta,cyan \"npm:start\" \"npm:start:web\"",
     "postinstall": "node scripts/ensure-web-deps.js",
+    "clean": "node scripts/clean-caches.js",
     "build": "esbuild src/main.ts --bundle --outfile=public/bundle.js --minify --sourcemap",
     "build:web": "cd web-ui && npx vite build",
     "watch": "esbuild src/main.ts --bundle --outfile=public/bundle.js --watch",

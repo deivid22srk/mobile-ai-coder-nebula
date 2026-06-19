@@ -16,6 +16,10 @@ workspace/
 logs/
 .DS_Store
 
+# Build stamps written by scripts/ensure-web-deps.js — local only, never commit
+web-ui/.build-version
+web-ui/.last-dev-run
+
 # Editor / OS
 .vscode/
 .idea/

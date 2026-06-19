@@ -1580,6 +1580,31 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Build version endpoint — serves web-ui/.build-version (written by
+// scripts/ensure-web-deps.js on each `npm run dev`). Lets the frontend
+// display "running version X" so users can confirm a `git pull` actually
+// took effect, and lets us bust browser cache by appending the SHA to
+// static asset URLs if needed.
+app.get('/api/build-version', async (req, res) => {
+  try {
+    const versionFile = path.join(__dirname, 'web-ui', '.build-version');
+    let version = null;
+    if (fsSync.existsSync(versionFile)) {
+      version = JSON.parse(fsSync.readFileSync(versionFile, 'utf8'));
+    }
+    // Also report server-side uptime so the frontend can show "backend
+    // restarted X minutes ago" — useful for debugging stale sessions.
+    res.json({
+      ok: true,
+      version,
+      serverUptime: process.uptime(),
+      serverStartedAt: new Date(Date.now() - process.uptime() * 1000).toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Map to keep track of active background processes (e.g. servers)
 const activeProcesses = new Map();
 

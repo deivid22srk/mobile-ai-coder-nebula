@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from './Icon';
+import { api } from '../api';
 import type { Chat } from '../types';
 
 interface SidebarProps {
@@ -40,6 +41,24 @@ export default function Sidebar({
   onDeleteChat
 }: SidebarProps) {
   const [search, setSearch] = useState('');
+  const [versionSha, setVersionSha] = useState<string>('');
+
+  // Fetch build version once on mount — used to display the git SHA in
+  // the footer so users can confirm a `git pull` actually took effect.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await api.buildVersion();
+        if (mounted && data.version?.sha) {
+          setVersionSha(data.version.sha);
+        }
+      } catch (_) {
+        // non-fatal
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const filtered = chats.filter(c =>
     c.title.toLowerCase().includes(search.toLowerCase())
@@ -144,6 +163,16 @@ export default function Sidebar({
             <span className="workspace-dot" />
             <span className="workspace-path">{workspacePath || './workspace'}</span>
           </div>
+          {versionSha && (
+            <div
+              className="workspace-pill"
+              title="Git SHA do build atual — confirme que bate com o último commit do repo"
+              style={{ cursor: 'default', fontSize: 10, gap: 6, padding: '5px 8px' }}
+            >
+              <Icon name="branch" size={11} style={{ color: 'var(--accent-violet)' }} />
+              <span className="mono" style={{ fontSize: 10, color: 'var(--text-muted)' }}>{versionSha}</span>
+            </div>
+          )}
         </div>
       </aside>
     </>

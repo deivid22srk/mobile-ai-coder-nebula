@@ -90,6 +90,22 @@ export const api = {
     return jsonOrThrow(await fetch('/api/health'));
   },
 
+  // Build version — git SHA + commit time, written by scripts/ensure-web-deps.js
+  async buildVersion(): Promise<{
+    ok: boolean;
+    version: {
+      sha: string;
+      commitTime: string;
+      buildTime: string;
+      nodeVersion: string;
+      platform: string;
+    } | null;
+    serverUptime: number;
+    serverStartedAt: string;
+  }> {
+    return jsonOrThrow(await fetch('/api/build-version'));
+  },
+
   // Skills
   async listSkills(): Promise<Skill[]> {
     const data = await jsonOrThrow<{ skills: Skill[] }>(await fetch('/api/skills'));
