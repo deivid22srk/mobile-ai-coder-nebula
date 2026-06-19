@@ -5,27 +5,27 @@
    ============================================================ */
 
 :root {
-  /* Surface palette — deep navy with cool undertones */
-  --bg-base: #07091a;
-  --bg-canvas: #0a0e1f;
-  --bg-surface: #11162a;
-  --bg-elevated: #161c33;
-  --bg-hover: #1c2340;
-  --bg-active: #232b4d;
+  /* Surface palette — near-black with the faintest cool tint */
+  --bg-base: #050608;
+  --bg-canvas: #08090c;
+  --bg-surface: #0c0e12;
+  --bg-elevated: #11141a;
+  --bg-hover: #161a22;
+  --bg-active: #1c2129;
 
-  /* Borders */
-  --border-subtle: rgba(124, 92, 252, 0.08);
-  --border-default: rgba(148, 163, 184, 0.12);
-  --border-strong: rgba(148, 163, 184, 0.22);
+  /* Borders — even more subtle against the darker base */
+  --border-subtle: rgba(124, 92, 252, 0.06);
+  --border-default: rgba(148, 163, 184, 0.08);
+  --border-strong: rgba(148, 163, 184, 0.16);
   --border-accent: rgba(124, 92, 252, 0.45);
 
-  /* Text */
+  /* Text — keep current luminance for accessibility */
   --text-primary: #eef1ff;
   --text-secondary: #a8b1d1;
   --text-tertiary: #6b7494;
   --text-muted: #4a5170;
 
-  /* Brand accents */
+  /* Brand accents — same as before, they pop more against the near-black */
   --accent-violet: #7c5cfc;
   --accent-violet-hover: #8d6fff;
   --accent-violet-soft: rgba(124, 92, 252, 0.14);
@@ -37,7 +37,7 @@
   /* Gradient */
   --gradient-brand: linear-gradient(135deg, #7c5cfc 0%, #22d3ee 100%);
   --gradient-brand-soft: linear-gradient(135deg, rgba(124, 92, 252, 0.18) 0%, rgba(34, 211, 238, 0.18) 100%);
-  --gradient-glow: radial-gradient(circle at top right, rgba(124, 92, 252, 0.15), transparent 50%);
+  --gradient-glow: radial-gradient(circle at top right, rgba(124, 92, 252, 0.10), transparent 50%);
 
   /* Status colors */
   --status-success: #34d399;
@@ -159,8 +159,8 @@ a:hover {
   height: 100vh;
   height: 100dvh;
   background:
-    radial-gradient(circle at 0% 0%, rgba(124, 92, 252, 0.08), transparent 35%),
-    radial-gradient(circle at 100% 0%, rgba(34, 211, 238, 0.05), transparent 40%),
+    radial-gradient(circle at 0% 0%, rgba(124, 92, 252, 0.05), transparent 35%),
+    radial-gradient(circle at 100% 0%, rgba(34, 211, 238, 0.03), transparent 40%),
     var(--bg-base);
 }
 
@@ -1482,6 +1482,51 @@ a:hover {
   overflow-y: auto;
 }
 
+/* Horizontal scrollable tab strip — shown only on mobile via media query */
+.settings-nav-tabs {
+  display: none;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  padding: 8px 12px;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.settings-nav-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s var(--ease-out);
+  flex-shrink: 0;
+}
+
+.settings-nav-tab:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.settings-nav-tab.active {
+  background: var(--accent-violet-soft);
+  color: var(--accent-violet);
+  border-color: var(--border-accent);
+}
+
 .settings-nav-item {
   display: flex;
   align-items: center;
@@ -2101,12 +2146,33 @@ a:hover {
     z-index: 39;
   }
 
+  /* Settings becomes a single-column flow with a horizontal tab strip on top */
   .settings-body {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 
   .settings-nav {
     display: none;
+  }
+
+  .settings-nav-tabs {
+    display: flex;
+  }
+
+  .settings-content {
+    padding: 16px 14px 32px;
+    max-width: none;
+  }
+
+  .settings-header {
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .settings-title {
+    font-size: 14px;
   }
 
   .welcome-prompts {
@@ -2117,6 +2183,52 @@ a:hover {
   .composer-inner {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .composer {
+    padding: 10px 12px 14px;
+  }
+
+  .header-center {
+    display: none;
+  }
+
+  .model-trigger {
+    display: none;
+  }
+
+  .welcome-title {
+    font-size: 24px;
+  }
+
+  .welcome-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  /* Modal cards: smaller padding on mobile */
+  .modal-card {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .modal-body {
+    padding: 14px;
+  }
+
+  .modal-footer {
+    padding: 10px 14px;
+  }
+
+  .explorer-grid {
+    grid-template-columns: 1fr;
+    height: 70vh;
+  }
+
+  .explorer-tree {
+    max-height: 35vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border-default);
   }
 }
 

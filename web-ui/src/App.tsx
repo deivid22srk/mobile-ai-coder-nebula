@@ -436,6 +436,34 @@ export default function App() {
           />
         )}
 
+        {/* Persistent warning banner when AI is not configured */}
+        {config && (!config.apiUrl || config.apiUrl.trim() === '' || !config.apiKey || config.apiKey === '0' || config.apiKey.trim() === '') && (
+          <div style={{
+            margin: '0 24px 8px',
+            padding: '10px 14px',
+            background: 'var(--status-error-soft)',
+            border: '1px solid rgba(248, 113, 113, 0.3)',
+            borderRadius: 'var(--radius-md)',
+            display: 'flex',
+            gap: 10,
+            alignItems: 'center',
+            fontSize: 13
+          }}>
+            <Icon name="alert" size={16} style={{ color: 'var(--status-error)', flexShrink: 0 }} />
+            <span style={{ color: 'var(--text-secondary)', flex: 1 }}>
+              <strong style={{ color: 'var(--status-error)' }}>IA não configurada.</strong>{' '}
+              O agente não vai responder até você preencher a API URL e API Key.
+            </span>
+            <button
+              className="btn-secondary"
+              style={{ padding: '4px 10px', fontSize: 12 }}
+              onClick={() => setShowSettings(true)}
+            >
+              Configurar
+            </button>
+          </div>
+        )}
+
         <Composer
           streaming={streaming}
           activeSkills={activeSkills}

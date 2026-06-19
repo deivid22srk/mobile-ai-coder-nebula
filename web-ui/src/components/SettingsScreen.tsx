@@ -166,6 +166,7 @@ export default function SettingsScreen({ config, onClose, onSaved }: SettingsPro
       </div>
 
       <div className="settings-body">
+        {/* Desktop sidebar nav */}
         <nav className="settings-nav">
           {NAV_ITEMS.map(item => (
             <button
@@ -179,6 +180,20 @@ export default function SettingsScreen({ config, onClose, onSaved }: SettingsPro
           ))}
         </nav>
 
+        {/* Mobile horizontal tab strip (CSS shows it only ≤860px) */}
+        <div className="settings-nav-tabs">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.id}
+              className={`settings-nav-tab ${category === item.id ? 'active' : ''}`}
+              onClick={() => setCategory(item.id)}
+            >
+              <Icon name={item.icon} size={13} />
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         <div className="settings-content">
           {/* LLM */}
           {category === 'llm' && (
@@ -188,6 +203,37 @@ export default function SettingsScreen({ config, onClose, onSaved }: SettingsPro
                 title="Provedor de API"
                 desc="Aponte o agente para qualquer endpoint compatível com OpenAI."
               />
+
+              {/* Warning banner when API is not configured */}
+              {(!draft.apiUrl || draft.apiUrl.trim() === '' || !draft.apiKey || draft.apiKey === '0' || draft.apiKey.trim() === '') && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: '14px 16px',
+                  background: 'var(--status-error-soft)',
+                  border: '1px solid rgba(248, 113, 113, 0.3)',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'flex-start'
+                }}>
+                  <div style={{ color: 'var(--status-error)', flexShrink: 0, marginTop: 1 }}>
+                    <Icon name="alert" size={18} />
+                  </div>
+                  <div style={{ fontSize: 13, lineHeight: 1.55 }}>
+                    <strong style={{ color: 'var(--status-error)', display: 'block', marginBottom: 2 }}>
+                      IA não está configurada
+                    </strong>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      Preencha <strong>API URL</strong> e <strong>API Key</strong> abaixo e clique em <strong>Salvar</strong>.
+                      Sem isso, o agente retorna erro quando você envia qualquer mensagem.
+                      {!draft.apiUrl || draft.apiUrl.trim() === ''
+                        ? ' (API URL está vazia)'
+                        : ' (API Key está vazia ou é "0")'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="settings-card">
                 <div className="form-group">
                   <label className="form-label">Provider</label>
